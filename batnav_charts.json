@@ -1,9 +1,27 @@
 {
     "8": [
         {
+            "nome": "IA-WADUDU",
+            "colpi": 26,
+            "perc_colpi": 42.30769230769231,
+            "data": "25/09/2025"
+        },
+        {
+            "nome": "IA-Gunene",
+            "colpi": 27,
+            "perc_colpi": 40.74074074074074,
+            "data": "25/09/2025"
+        },
+        {
             "nome": "Gabry",
             "colpi": 32,
             "perc_colpi": 34.375
+        },
+        {
+            "nome": "gabry",
+            "colpi": 33,
+            "perc_colpi": 33.33333333333333,
+            "data": "24/09/2025"
         }
     ],
     "9": [
@@ -11,6 +29,26 @@
             "nome": "IA-DUTITI",
             "colpi": 25,
             "perc_colpi": 44.0,
+            "data": "24/09/2025"
+        },
+        {
+            "nome": "IA-ZASESE",
+            "colpi": 33,
+            "perc_colpi": 33.33333333333333,
+            "data": "24/09/2025"
+        },
+        {
+            "nome": "Super Gabry",
+            "colpi": 41,
+            "perc_colpi": 26.82926829268293,
+            "data": "24/09/2025"
+        }
+    ],
+    "14": [
+        {
+            "nome": "IA-PAWIWI",
+            "colpi": 95,
+            "perc_colpi": 24.210526315789473,
             "data": "24/09/2025"
         }
     ]

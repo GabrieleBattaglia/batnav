@@ -1,14 +1,20 @@
 # BATNAV by Gabriele Battaglia (IZ4APU) and Gemini
-# Versione 1.1.2 - Data refactor 24/09/2025
+# Data refactor 24/09/2025
 import random, sys, json # <-- AGGIUNTO json
 from datetime import date
 
 # --- Costanti ---
-VERSIONE="2.0.1 - 24 settembre 2025 by Gabriele Battaglia (IZ4APU) and Gemini"
+VERSIONE="2.1.1 - 25 settembre 2025 by Gabriele Battaglia (IZ4APU) and Gemini"
 CLASSIFICA_FILE = "batnav_charts.json" # <-- NUOVA costante per il file della classifica
 CLASSIFICA_MAX_VOCI = 15 # <-- NUOVA costante per il numero massimo di voci
-
-# --- Costanti di Stato Interno ---
+NATO_PHONETIC_ALPHABET = {
+    'A': 'Alfa', 'B': 'Bravo', 'C': 'Charlie', 'D': 'Delta', 'E': 'Echo', 
+    'F': 'Foxtrot', 'G': 'Golf', 'H': 'Hotel', 'I': 'India', 'J': 'Juliett', 
+    'K': 'Kilo', 'L': 'Lima', 'M': 'Mike', 'N': 'November', 'O': 'Oscar', 
+    'P': 'Papa', 'Q': 'Quebec', 'R': 'Romeo', 'S': 'Sierra', 'T': 'Tango', 
+    'U': 'Uniform', 'V': 'Victor', 'W': 'Whiskey', 'X': 'X-ray', 'Y': 'Yankee', 
+    'Z': 'Zulu'
+}
 INTERNAL_HIT = 'x'
 INTERNAL_SUNK = '#'
 
@@ -47,15 +53,17 @@ def save_classifica(classifica):
         json.dump(classifica, f, indent=4)
 
 def generate_ai_name():
-    """Genera un nome casuale per l'IA secondo lo schema IA-c1v1c2v2c2v2."""
+    """Genera un nome casuale per l'IA con la prima lettera maiuscola (es. IA-Fofofo)."""
     consonanti = "BCDFGHJKLMNPQRSTVWXYZ"
     vocali = "AEIOU"
     c1 = random.choice(consonanti)
     c2 = random.choice(consonanti)
     v1 = random.choice(vocali)
     v2 = random.choice(vocali)
-    return f"IA-{c1}{v1}{c2}{v2}{c2}{v2}"
-
+    # ## <-- MODIFICA: Formatta il nome in minuscolo e poi applica .title()
+    random_part = f"{c1}{v1}{c2}{v2}{c2}{v2}"
+    formatted_part = random_part.lower().title()
+    return f"IA-{formatted_part}"
 def update_and_display_classifica(classifica, size, winner_name, shots, accuracy):
     """Aggiorna la classifica con il nuovo risultato, la ordina, la limita e la stampa."""
     size_key = str(size) # Le chiavi JSON devono essere stringhe
@@ -340,20 +348,39 @@ def create_fleet_grid(size, user_grid, ai_hits_on_user):
     return grid
 
 def print_dual_grids(left_grid, right_grid, size):
+    """
+    Stampa le due griglie affiancate con una cornice completa in stile scacchiera
+    e le coordinate sui bordi esterni (numeri a sx, lettere in basso).
+    """
     left_title, right_title = "GRIGLIA BERSAGLIO", "LA TUA FLOTTA"
-    spacing = " " * (size - len(left_title) + 5)
-    print(f"\n{left_title}{spacing}{right_title}")
+    # Spazio fisso tra le due griglie per un allineamento perfetto
+    spacing_grids = " " * 7 
+
+    # Stampa i titoli delle griglie
+    print(f"\n{left_title}{spacing_grids}{right_title}")
+
+    # ## <-- MODIFICA: Definizione della cornice e delle etichette
+    # La linea orizzontale per la cornice superiore e inferiore (es. '  +----------+')
+    top_bottom_frame = "  +" + "-" * size + "+"
+    # Le etichette per le colonne da mostrare in basso (es. '   ABCDEFGHIJ')
     col_labels = "   " + "".join([chr(ord('A') + i) for i in range(size)])
-    spacing_grids = "      "
-    print(f"{col_labels}{spacing_grids}{col_labels}")
+
+    # 1. Stampa la cornice SUPERIORE
+    print(f"{top_bottom_frame}{spacing_grids}{top_bottom_frame}")
+
+    # 2. Stampa le righe della griglia, ciascuna incorniciata verticalmente
     for r in range(size):
         row_label = size - r
+        # La cornice verticale '|' è aggiunta a entrambi i lati del contenuto della riga
         left_row_str = f"{row_label:<2}|" + "".join(left_grid[r]) + "|"
         right_row_str = f"{row_label:<2}|" + "".join(right_grid[r]) + "|"
         print(f"{left_row_str}{spacing_grids}{right_row_str}")
-    bottom_frame = "  +" + "-" * size + "+"
-    print(f"{bottom_frame}{spacing_grids}{bottom_frame}")
 
+    # 3. Stampa la cornice INFERIORE
+    print(f"{top_bottom_frame}{spacing_grids}{top_bottom_frame}")
+
+    # 4. ## <-- MODIFICA: Stampa le etichette con le lettere SOTTO la griglia
+    print(f"{col_labels}{spacing_grids}{col_labels}")
 def build_prompt_string(turn, user_fleet, ai_fleet, user_hits_on_ai, ai_hits_on_user):
     user_sunk_ships = sum(1 for ship in user_fleet if ship.is_sunk())
     ai_sunk_ships = sum(1 for ship in ai_fleet if ship.is_sunk())
@@ -366,13 +393,19 @@ def build_prompt_string(turn, user_fleet, ai_fleet, user_hits_on_ai, ai_hits_on_
     ai_ships_str = f"{len(ai_fleet) - ai_sunk_ships}/{len(ai_fleet)}"
     return f"T:{turn} N:{user_ships_str} A:{ai_ships_str} p%:{user_accuracy:.1f}/{ai_accuracy:.1f}> "
 
-# --- Funzione Principale ---
-
 def main():
     print(f"\nBenvenuto alla Battaglia Navale!\n\t\t{VERSIONE}")
     
-    # Carica la classifica all'inizio
     classifica = load_classifica()
+
+    nome_giocatore = ""
+    while not nome_giocatore:
+        nome_giocatore = input("Inserisci il tuo nome: ").strip().title()
+        if not nome_giocatore:
+            print("Il nome non può essere vuoto. Riprova.")
+
+    nome_ia = generate_ai_name()
+    print(f"\nCiao {nome_giocatore}! Oggi sfiderai {nome_ia}.")
 
     size = 0
     while not (8 <= size <= 26):
@@ -384,21 +417,45 @@ def main():
                 print("Dimensione non valida. Inserisci un numero tra 8 e 26.")
         except ValueError:
             print("Input non valido. Inserisci un numero.")
+    
     ships_config = generate_fleet_config(size)
     print(f"Giocherai su una griglia {size}x{size} con {len(ships_config)} navi.")
     user_grid, ai_grid = initialize_grid(size), initialize_grid(size)
     user_fleet = place_ships_manually(user_grid, ships_config, size)
     ai_fleet = place_ships_randomly(ai_grid, ships_config, size)
+    
     print("\nOttimo! La tua flotta è schierata. Che la battaglia abbia inizio!")
     user_hits_on_ai, ai_hits_on_user = initialize_grid(size), initialize_grid(size)
+    
     ai_target_hits = []
     game_over = False
-    winner = None # Variabile per sapere chi ha vinto
+    winner = None 
     turn = 1
+    
+    turno_corrente = random.choice(['giocatore', 'IA'])
+    print(f"\nIl sorteggio ha deciso! Il primo a giocare è: {nome_giocatore if turno_corrente == 'giocatore' else nome_ia}")
+    
+    target_grid = create_target_grid(size, user_hits_on_ai)
+    fleet_grid = create_fleet_grid(size, user_grid, ai_hits_on_user)
+    print_dual_grids(target_grid, fleet_grid, size)
+
+    if turno_corrente == 'IA':
+        ai_row, ai_col = ai_advanced_shot(ai_hits_on_user, size, user_fleet, ai_target_hits)
+        result, hit_ship = take_shot(user_grid, user_fleet, ai_hits_on_user, ai_row, ai_col)
+        
+        lettera = chr(ord('A') + ai_col)
+        parola_fonetica = NATO_PHONETIC_ALPHABET[lettera]
+        shot_coord_str = f"{parola_fonetica} {size - ai_row}"
+        print(f"{nome_ia} spara in {shot_coord_str}. Risultato: >> {result} <<")
+
+        if "Colpito" in result:
+            ai_target_hits.append((ai_row, ai_col))
+            if "affondato" in result: ai_target_hits = []
+        turn += 1
+
     while not game_over:
-        target_grid = create_target_grid(size, user_hits_on_ai)
-        fleet_grid = create_fleet_grid(size, user_grid, ai_hits_on_user)
-        print_dual_grids(target_grid, fleet_grid, size)
+        # 1. Turno del Giocatore
+        # ## <-- MODIFICA: Rimossa la riga "--- Tocca a..." per avere il prompt subito sotto la griglia.
         valid_shot = False
         while not valid_shot:
             try:
@@ -418,41 +475,50 @@ def main():
                     game_over = True
             except ValueError as e:
                 print(f"Errore: {e}. Riprova.")
+        
         if game_over: break
-        print("\n--- Turno dell'IA ---")
+
+        # 2. Turno dell'IA
         ai_row, ai_col = ai_advanced_shot(ai_hits_on_user, size, user_fleet, ai_target_hits)
         result, hit_ship = take_shot(user_grid, user_fleet, ai_hits_on_user, ai_row, ai_col)
-        shot_coord_str = f"{chr(ord('A') + ai_col)}{size - ai_row}"
-        print(f"L'IA spara in {shot_coord_str}. Risultato: >> {result} <<")
+
+        # ## <-- MODIFICA: Usa l'alfabeto fonetico e condensa l'output in una riga.
+        lettera = chr(ord('A') + ai_col)
+        parola_fonetica = NATO_PHONETIC_ALPHABET[lettera]
+        shot_coord_str = f"{parola_fonetica} {size - ai_row}"
+        print(f"{nome_ia} spara in {shot_coord_str}. Risultato: >> {result} <<")
+        
         if "Colpito" in result:
             ai_target_hits.append((ai_row, ai_col))
-            if "affondato" in result:
-                ai_target_hits = []
+            if "affondato" in result: ai_target_hits = []
+        
         if all_ships_sunk(user_fleet):
             print("\n☠️ PECCATO! L'IA ha vinto. ☠️")
             winner = "IA"
             game_over = True
+        
+        if game_over: break
+
+        # 3. Stampa le griglie alla fine del turno
+        target_grid = create_target_grid(size, user_hits_on_ai)
+        fleet_grid = create_fleet_grid(size, user_grid, ai_hits_on_user)
+        print_dual_grids(target_grid, fleet_grid, size)
+
         turn += 1
 
-    # --- Logica di Fine Partita (NUOVA) ---
+    # Logica di Fine Partita (invariata)
     if game_over:
         if winner == "Player":
-            winner_name = ""
-            while not winner_name:
-                winner_name = input("Inserisci il tuo nome per la classifica: ").strip()
-                if not winner_name:
-                    print("Il nome non può essere vuoto.")
+            winner_name = nome_giocatore
             shots, accuracy = calculate_stats(user_hits_on_ai)
-        else: # L'IA ha vinto
-            winner_name = generate_ai_name()
+        else:
+            winner_name = nome_ia
             print(f"L'IA si registra in classifica con il nome: {winner_name}")
             shots, accuracy = calculate_stats(ai_hits_on_user)
             
-        # Aggiorna, mostra e salva la classifica
         classifica_aggiornata = update_and_display_classifica(classifica, size, winner_name, shots, accuracy)
         save_classifica(classifica_aggiornata)
         print("\nClassifica salvata. Grazie per aver giocato!")
-
-
 if __name__ == "__main__":
     main()
+    attesa=input("Premi Invio per uscire...")
