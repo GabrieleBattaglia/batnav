@@ -18,6 +18,12 @@
             "perc_colpi": 34.375
         },
         {
+            "nome": "IA-Ramimi",
+            "colpi": 32,
+            "perc_colpi": 34.375,
+            "data": "07/10/2025"
+        },
+        {
             "nome": "gabry",
             "colpi": 33,
             "perc_colpi": 33.33333333333333,
