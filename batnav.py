@@ -4,7 +4,7 @@ import random, sys, json # <-- AGGIUNTO json
 from datetime import date
 
 # --- Costanti ---
-VERSIONE="2.1.1 - 25 settembre 2025 by Gabriele Battaglia (IZ4APU) and Gemini"
+VERSIONE="2.2.0 - 5 marzo 2026 by Gabriele Battaglia (IZ4APU) and Stella"
 CLASSIFICA_FILE = "batnav_charts.json" # <-- NUOVA costante per il file della classifica
 CLASSIFICA_MAX_VOCI = 15 # <-- NUOVA costante per il numero massimo di voci
 NATO_PHONETIC_ALPHABET = {
@@ -226,6 +226,14 @@ def take_shot(opponent_grid, opponent_fleet, hits_grid, row, col):
         if target.is_sunk():
             for r_ship, c_ship in target.coordinates:
                 hits_grid[r_ship][c_ship] = INTERNAL_SUNK
+            # NUOVO: Buffer rule per i dintorni della nave affondata
+            for r_ship, c_ship in target.coordinates:
+                for dr in [-1, 0, 1]:
+                    for dc in [-1, 0, 1]:
+                        nr, nc = r_ship + dr, c_ship + dc
+                        if 0 <= nr < len(hits_grid) and 0 <= nc < len(hits_grid[0]):
+                            if hits_grid[nr][nc] == MAP_UNKNOWN:
+                                hits_grid[nr][nc] = MAP_MISS
             return "Colpito e affondato!", target
         else:
             return "Colpito!", target
@@ -250,7 +258,7 @@ def calculate_stats(hits_grid): # <-- NUOVA funzione di utilità
 
 def _calculate_hunt_probabilities(hits_grid, size, ship_lengths):
     prob_map = [[0 for _ in range(size)] for _ in range(size)]
-    for length in ship_lengths:
+    for length in set(ship_lengths):
         for r in range(size):
             for c in range(size):
                 if c + length <= size:
@@ -263,37 +271,44 @@ def _calculate_hunt_probabilities(hits_grid, size, ship_lengths):
                             prob_map[r+i][c] += 1
     return prob_map
 
-def _calculate_target_probabilities(hits_grid, size, ship_lengths, target_hits):
+def _calculate_target_probabilities(hits_grid, size, ship_lengths):
     prob_map = [[0 for _ in range(size)] for _ in range(size)]
-    for length in ship_lengths:
-        for r_hit, c_hit in target_hits:
-            for offset in range(length):
+    for length in set(ship_lengths):
+        for r in range(size):
+            for c in range(size):
                 # Orizzontale
-                start_r, start_c = r_hit, c_hit - offset
-                if start_c + length <= size and start_c >= 0:
-                    possible_coords = [(start_r, start_c + i) for i in range(length)]
-                    if all(hits_grid[r][c] in [MAP_UNKNOWN, INTERNAL_HIT] for r,c in possible_coords) and \
-                       all(hit in possible_coords for hit in target_hits):
-                        for r,c in possible_coords:
-                            if hits_grid[r][c] == MAP_UNKNOWN:
-                                prob_map[r][c] += 1
+                if c + length <= size:
+                    possible_coords = [(r, c + i) for i in range(length)]
+                    if all(hits_grid[pr][pc] in [MAP_UNKNOWN, INTERNAL_HIT] for pr, pc in possible_coords):
+                        hits_in_placement = sum(1 for pr, pc in possible_coords if hits_grid[pr][pc] == INTERNAL_HIT)
+                        if hits_in_placement > 0:
+                            weight = hits_in_placement ** 2
+                            for pr, pc in possible_coords:
+                                if hits_grid[pr][pc] == MAP_UNKNOWN:
+                                    prob_map[pr][pc] += weight
                 # Verticale
-                start_r, start_c = r_hit - offset, c_hit
-                if start_r + length <= size and start_r >= 0:
-                    possible_coords = [(start_r + i, start_c) for i in range(length)]
-                    if all(hits_grid[r][c] in [MAP_UNKNOWN, INTERNAL_HIT] for r,c in possible_coords) and \
-                       all(hit in possible_coords for hit in target_hits):
-                        for r,c in possible_coords:
-                            if hits_grid[r][c] == MAP_UNKNOWN:
-                                prob_map[r][c] += 1
+                if r + length <= size:
+                    possible_coords = [(r + i, c) for i in range(length)]
+                    if all(hits_grid[pr][pc] in [MAP_UNKNOWN, INTERNAL_HIT] for pr, pc in possible_coords):
+                        hits_in_placement = sum(1 for pr, pc in possible_coords if hits_grid[pr][pc] == INTERNAL_HIT)
+                        if hits_in_placement > 0:
+                            weight = hits_in_placement ** 2
+                            for pr, pc in possible_coords:
+                                if hits_grid[pr][pc] == MAP_UNKNOWN:
+                                    prob_map[pr][pc] += weight
     return prob_map
 
-def ai_advanced_shot(hits_grid, size, opponent_fleet, ai_target_hits):
+def ai_advanced_shot(hits_grid, size, opponent_fleet):
     remaining_ship_lengths = [ship.length for ship in opponent_fleet if not ship.is_sunk()]
+    
+    # Rileva dinamicamente i colpi a segno su navi non ancora affondate
+    ai_target_hits = [(r, c) for r in range(size) for c in range(size) if hits_grid[r][c] == INTERNAL_HIT]
+    
     if not ai_target_hits:
         prob_map = _calculate_hunt_probabilities(hits_grid, size, remaining_ship_lengths)
     else:
-        prob_map = _calculate_target_probabilities(hits_grid, size, remaining_ship_lengths, ai_target_hits)
+        prob_map = _calculate_target_probabilities(hits_grid, size, remaining_ship_lengths)
+        
     max_prob = -1
     best_shots = []
     for r in range(size):
@@ -303,7 +318,21 @@ def ai_advanced_shot(hits_grid, size, opponent_fleet, ai_target_hits):
                 best_shots = [(r, c)]
             elif prob_map[r][c] == max_prob and prob_map[r][c] > 0:
                 best_shots.append((r, c))
-    if not best_shots:
+                
+    if max_prob <= 0 or not best_shots:
+        # Fallback a ricerca se il target è vuoto (es. navi impossibili da piazzare)
+        prob_map = _calculate_hunt_probabilities(hits_grid, size, remaining_ship_lengths)
+        max_prob = -1
+        best_shots = []
+        for r in range(size):
+            for c in range(size):
+                if prob_map[r][c] > max_prob:
+                    max_prob = prob_map[r][c]
+                    best_shots = [(r, c)]
+                elif prob_map[r][c] == max_prob and prob_map[r][c] > 0:
+                    best_shots.append((r, c))
+                    
+    if max_prob <= 0 or not best_shots:
         possible_shots = [(r, c) for r in range(size) for c in range(size) if hits_grid[r][c] == MAP_UNKNOWN]
         return random.choice(possible_shots) if possible_shots else (0,0)
     return random.choice(best_shots)
@@ -427,7 +456,6 @@ def main():
     print("\nOttimo! La tua flotta è schierata. Che la battaglia abbia inizio!")
     user_hits_on_ai, ai_hits_on_user = initialize_grid(size), initialize_grid(size)
     
-    ai_target_hits = []
     game_over = False
     winner = None 
     turn = 1
@@ -440,17 +468,13 @@ def main():
     print_dual_grids(target_grid, fleet_grid, size)
 
     if turno_corrente == 'IA':
-        ai_row, ai_col = ai_advanced_shot(ai_hits_on_user, size, user_fleet, ai_target_hits)
+        ai_row, ai_col = ai_advanced_shot(ai_hits_on_user, size, user_fleet)
         result, hit_ship = take_shot(user_grid, user_fleet, ai_hits_on_user, ai_row, ai_col)
         
         lettera = chr(ord('A') + ai_col)
         parola_fonetica = NATO_PHONETIC_ALPHABET[lettera]
         shot_coord_str = f"{parola_fonetica} {size - ai_row}"
         print(f"{nome_ia} spara in {shot_coord_str}. Risultato: >> {result} <<")
-
-        if "Colpito" in result:
-            ai_target_hits.append((ai_row, ai_col))
-            if "affondato" in result: ai_target_hits = []
         turn += 1
 
     while not game_over:
@@ -479,7 +503,7 @@ def main():
         if game_over: break
 
         # 2. Turno dell'IA
-        ai_row, ai_col = ai_advanced_shot(ai_hits_on_user, size, user_fleet, ai_target_hits)
+        ai_row, ai_col = ai_advanced_shot(ai_hits_on_user, size, user_fleet)
         result, hit_ship = take_shot(user_grid, user_fleet, ai_hits_on_user, ai_row, ai_col)
 
         # ## <-- MODIFICA: Usa l'alfabeto fonetico e condensa l'output in una riga.
@@ -487,10 +511,6 @@ def main():
         parola_fonetica = NATO_PHONETIC_ALPHABET[lettera]
         shot_coord_str = f"{parola_fonetica} {size - ai_row}"
         print(f"{nome_ia} spara in {shot_coord_str}. Risultato: >> {result} <<")
-        
-        if "Colpito" in result:
-            ai_target_hits.append((ai_row, ai_col))
-            if "affondato" in result: ai_target_hits = []
         
         if all_ships_sunk(user_fleet):
             print("\n☠️ PECCATO! L'IA ha vinto. ☠️")
