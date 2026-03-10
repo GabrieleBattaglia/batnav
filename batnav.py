@@ -1,6 +1,8 @@
 # BATNAV by Gabriele Battaglia (IZ4APU) and Gemini
 # Data refactor 24/09/2025
-import random, sys, json # <-- AGGIUNTO json
+import random
+import sys
+import json # <-- AGGIUNTO json
 from datetime import date
 
 # --- Costanti ---
@@ -174,7 +176,7 @@ def place_ships_manually(player_grid, ships_lengths, size):
             print("\nLa tua flotta:")
             print_grid_setup(player_grid, size)
             print(f"Posiziona la tua nave da {length} caselle.")
-            coord_str = input(f"Inserisci coordinata (es. A1), 'ia' (auto) o 'q' (esci): ").strip().upper()
+            coord_str = input("Inserisci coordinata (es. A1), 'ia' (auto) o 'q' (esci): ").strip().upper()
             if coord_str == 'Q':
                 print("Uscita dal gioco in corso...")
                 sys.exit()
