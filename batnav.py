@@ -3,10 +3,40 @@
 import random
 import sys
 import json # <-- AGGIUNTO json
+import os
 from datetime import date
 
+# Aggiunge il percorso di gbutils per poter importare GBUtils
+sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "gbutils"))
+try:
+    from GBUtils import Acusticator
+except ImportError:
+    def Acusticator(*args, **kwargs):
+        pass
+
+def play_db_sound(sound_name, sync=False):
+    """Carica e riproduce un suono dal database Acu_Collection.json usando Acusticator."""
+    try:
+        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "gbutils", "Acu_Collection.json")
+        if not os.path.exists(db_path):
+            return
+        with open(db_path, "r", encoding="utf-8") as f:
+            db = json.load(f)
+        if sound_name not in db:
+            return
+        preset = db[sound_name]
+        score_flat = []
+        default_vol = 0.5
+        for q in preset['score']:
+            note, dur, pan, vol_delta = q
+            vol = max(0.0, min(1.0, default_vol + vol_delta))
+            score_flat.extend([note, dur, pan, vol])
+        Acusticator(score_flat, kind=preset['kind'], adsr=preset['adsr'], sync=sync)
+    except Exception:
+        pass
+
 # --- Costanti ---
-VERSIONE="2.3.0 - 27 maggio 2026 by Gabriele Battaglia (IZ4APU) and Stella"
+VERSIONE="2.4.0 - 28 maggio 2026 by Gabriele Battaglia (IZ4APU) and Stella"
 CLASSIFICA_FILE = "batnav_charts.json" # <-- NUOVA costante per il file della classifica
 CLASSIFICA_MAX_VOCI = 15 # <-- NUOVA costante per il numero massimo di voci
 NATO_PHONETIC_ALPHABET = {
@@ -478,12 +508,19 @@ def main():
 
     if turno_corrente == 'IA':
         ai_row, ai_col = ai_advanced_shot(ai_hits_on_user, size, user_fleet, ai_state)
+        play_db_sound("arrivo_missile", sync=True)
         result, hit_ship = take_shot(user_grid, user_fleet, ai_hits_on_user, ai_row, ai_col)
         
         lettera = chr(ord('A') + ai_col)
         parola_fonetica = NATO_PHONETIC_ALPHABET[lettera]
         shot_coord_str = f"{parola_fonetica} {size - ai_row}"
         print(f"{nome_ia} spara in {shot_coord_str}. Risultato: >> {result} <<")
+        if result == "Mancato!":
+            play_db_sound("discesa_ideale", sync=False)
+        elif result == "Colpito!":
+            play_db_sound("colpo_d_impatto_5", sync=False)
+        elif result == "Colpito e affondato!":
+            play_db_sound("sirena_d_allarme_1", sync=False)
         turn += 1
 
     while not game_over:
@@ -499,11 +536,19 @@ def main():
                     sys.exit()
                 if not shot_str: continue
                 row, col = parse_coordinate(shot_str, size)
+                play_db_sound("arrivo_missile", sync=True)
                 result, hit_ship = take_shot(ai_grid, ai_fleet, user_hits_on_ai, row, col)
                 print(f"Risultato del tuo colpo: >> {result} <<")
                 valid_shot = True
+                if result == "Mancato!":
+                    play_db_sound("discesa_ideale", sync=False)
+                elif result == "Colpito!":
+                    play_db_sound("colpo_d_impatto_5", sync=False)
+                elif result == "Colpito e affondato!":
+                    play_db_sound("sirena_d_allarme_1", sync=False)
                 if all_ships_sunk(ai_fleet):
                     print("\n🎉 CONGRATULAZIONI! Hai vinto! 🎉")
+                    play_db_sound("jingle_vince_1", sync=True)
                     winner = "Player"
                     game_over = True
             except ValueError as e:
@@ -513,6 +558,7 @@ def main():
 
         # 2. Turno dell'IA
         ai_row, ai_col = ai_advanced_shot(ai_hits_on_user, size, user_fleet, ai_state)
+        play_db_sound("arrivo_missile", sync=True)
         result, hit_ship = take_shot(user_grid, user_fleet, ai_hits_on_user, ai_row, ai_col)
 
         # ## <-- MODIFICA: Usa l'alfabeto fonetico e condensa l'output in una riga.
@@ -521,8 +567,16 @@ def main():
         shot_coord_str = f"{parola_fonetica} {size - ai_row}"
         print(f"{nome_ia} spara in {shot_coord_str}. Risultato: >> {result} <<")
         
+        if result == "Mancato!":
+            play_db_sound("discesa_ideale", sync=False)
+        elif result == "Colpito!":
+            play_db_sound("colpo_d_impatto_5", sync=False)
+        elif result == "Colpito e affondato!":
+            play_db_sound("sirena_d_allarme_1", sync=False)
+            
         if all_ships_sunk(user_fleet):
             print("\n☠️ PECCATO! L'IA ha vinto. ☠️")
+            play_db_sound("jingle_perde_1", sync=True)
             winner = "IA"
             game_over = True
         
