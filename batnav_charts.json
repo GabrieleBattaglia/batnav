@@ -34,6 +34,18 @@
             "colpi": 46,
             "perc_colpi": 23.91304347826087,
             "data": "05/03/2026"
+        },
+        {
+            "nome": "IA-Dizuzu",
+            "colpi": 50,
+            "perc_colpi": 22.0,
+            "data": "28/05/2026"
+        },
+        {
+            "nome": "IA-Visusu",
+            "colpi": 50,
+            "perc_colpi": 22.0,
+            "data": "28/05/2026"
         }
     ],
     "9": [
