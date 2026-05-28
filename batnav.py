@@ -6,7 +6,7 @@ import json # <-- AGGIUNTO json
 from datetime import date
 
 # --- Costanti ---
-VERSIONE="2.2.0 - 5 marzo 2026 by Gabriele Battaglia (IZ4APU) and Stella"
+VERSIONE="2.3.0 - 27 maggio 2026 by Gabriele Battaglia (IZ4APU) and Stella"
 CLASSIFICA_FILE = "batnav_charts.json" # <-- NUOVA costante per il file della classifica
 CLASSIFICA_MAX_VOCI = 15 # <-- NUOVA costante per il numero massimo di voci
 NATO_PHONETIC_ALPHABET = {
@@ -258,9 +258,11 @@ def calculate_stats(hits_grid): # <-- NUOVA funzione di utilità
 
 # --- Intelligenza Artificiale (IA) ---
 
-def _calculate_hunt_probabilities(hits_grid, size, ship_lengths):
+def _calculate_hunt_probabilities(hits_grid, size, ship_lengths, parity_offset):
+    """Densità di probabilità in Hunt mode con filtro parità e peso per duplicati."""
     prob_map = [[0 for _ in range(size)] for _ in range(size)]
-    for length in set(ship_lengths):
+    min_length = min(ship_lengths) if ship_lengths else 2
+    for length in ship_lengths:
         for r in range(size):
             for c in range(size):
                 if c + length <= size:
@@ -271,11 +273,17 @@ def _calculate_hunt_probabilities(hits_grid, size, ship_lengths):
                     if all(hits_grid[r+i][c] == MAP_UNKNOWN for i in range(length)):
                         for i in range(length):
                             prob_map[r+i][c] += 1
+    # Filtro parità: azzera celle fuori dal pattern ottimale per la nave più corta
+    for r in range(size):
+        for c in range(size):
+            if (r + c) % min_length != parity_offset % min_length:
+                prob_map[r][c] = 0
     return prob_map
 
 def _calculate_target_probabilities(hits_grid, size, ship_lengths):
+    """Densità di probabilità in Target mode con peso cubico e duplicati."""
     prob_map = [[0 for _ in range(size)] for _ in range(size)]
-    for length in set(ship_lengths):
+    for length in ship_lengths:
         for r in range(size):
             for c in range(size):
                 # Orizzontale
@@ -284,7 +292,7 @@ def _calculate_target_probabilities(hits_grid, size, ship_lengths):
                     if all(hits_grid[pr][pc] in [MAP_UNKNOWN, INTERNAL_HIT] for pr, pc in possible_coords):
                         hits_in_placement = sum(1 for pr, pc in possible_coords if hits_grid[pr][pc] == INTERNAL_HIT)
                         if hits_in_placement > 0:
-                            weight = hits_in_placement ** 2
+                            weight = hits_in_placement ** 3
                             for pr, pc in possible_coords:
                                 if hits_grid[pr][pc] == MAP_UNKNOWN:
                                     prob_map[pr][pc] += weight
@@ -294,24 +302,27 @@ def _calculate_target_probabilities(hits_grid, size, ship_lengths):
                     if all(hits_grid[pr][pc] in [MAP_UNKNOWN, INTERNAL_HIT] for pr, pc in possible_coords):
                         hits_in_placement = sum(1 for pr, pc in possible_coords if hits_grid[pr][pc] == INTERNAL_HIT)
                         if hits_in_placement > 0:
-                            weight = hits_in_placement ** 2
+                            weight = hits_in_placement ** 3
                             for pr, pc in possible_coords:
                                 if hits_grid[pr][pc] == MAP_UNKNOWN:
                                     prob_map[pr][pc] += weight
     return prob_map
 
-def ai_advanced_shot(hits_grid, size, opponent_fleet):
+def ai_advanced_shot(hits_grid, size, opponent_fleet, ai_state):
+    """Seleziona il miglior colpo combinando densità Hunt e Target con tie-breaking centrale."""
     remaining_ship_lengths = [ship.length for ship in opponent_fleet if not ship.is_sunk()]
-    
-    # Rileva dinamicamente i colpi a segno su navi non ancora affondate
-    ai_target_hits = [(r, c) for r in range(size) for c in range(size) if hits_grid[r][c] == INTERNAL_HIT]
-    
-    if not ai_target_hits:
-        prob_map = _calculate_hunt_probabilities(hits_grid, size, remaining_ship_lengths)
+    if not remaining_ship_lengths:
+        possible = [(r, c) for r in range(size) for c in range(size) if hits_grid[r][c] == MAP_UNKNOWN]
+        return random.choice(possible) if possible else (0, 0)
+    has_targets = any(hits_grid[r][c] == INTERNAL_HIT for r in range(size) for c in range(size))
+    hunt_map = _calculate_hunt_probabilities(hits_grid, size, remaining_ship_lengths, ai_state['parity'])
+    # Combina Hunt + Target: Target domina vicino ai colpi, Hunt mantiene il piano base
+    if has_targets:
+        target_map = _calculate_target_probabilities(hits_grid, size, remaining_ship_lengths)
+        prob_map = [[target_map[r][c] * 10 + hunt_map[r][c] for c in range(size)] for r in range(size)]
     else:
-        prob_map = _calculate_target_probabilities(hits_grid, size, remaining_ship_lengths)
-        
-    max_prob = -1
+        prob_map = hunt_map
+    max_prob = 0
     best_shots = []
     for r in range(size):
         for c in range(size):
@@ -320,24 +331,19 @@ def ai_advanced_shot(hits_grid, size, opponent_fleet):
                 best_shots = [(r, c)]
             elif prob_map[r][c] == max_prob and prob_map[r][c] > 0:
                 best_shots.append((r, c))
-                
-    if max_prob <= 0 or not best_shots:
-        # Fallback a ricerca se il target è vuoto (es. navi impossibili da piazzare)
-        prob_map = _calculate_hunt_probabilities(hits_grid, size, remaining_ship_lengths)
-        max_prob = -1
-        best_shots = []
-        for r in range(size):
-            for c in range(size):
-                if prob_map[r][c] > max_prob:
-                    max_prob = prob_map[r][c]
-                    best_shots = [(r, c)]
-                elif prob_map[r][c] == max_prob and prob_map[r][c] > 0:
-                    best_shots.append((r, c))
-                    
-    if max_prob <= 0 or not best_shots:
-        possible_shots = [(r, c) for r in range(size) for c in range(size) if hits_grid[r][c] == MAP_UNKNOWN]
-        return random.choice(possible_shots) if possible_shots else (0,0)
-    return random.choice(best_shots)
+    if not best_shots:
+        # Fallback senza filtro parità
+        possible = [(r, c) for r in range(size) for c in range(size) if hits_grid[r][c] == MAP_UNKNOWN]
+        if not possible:
+            return (0, 0)
+        center = (size - 1) / 2.0
+        possible.sort(key=lambda p: (p[0] - center) ** 2 + (p[1] - center) ** 2)
+        return possible[0]
+    # Tie-breaking: preferisci celle vicine al centro
+    center = (size - 1) / 2.0
+    best_shots.sort(key=lambda p: (p[0] - center) ** 2 + (p[1] - center) ** 2)
+    top_n = min(3, len(best_shots))
+    return random.choice(best_shots[:top_n])
 
 # --- Funzioni di Visualizzazione ---
 
@@ -457,6 +463,7 @@ def main():
     
     print("\nOttimo! La tua flotta è schierata. Che la battaglia abbia inizio!")
     user_hits_on_ai, ai_hits_on_user = initialize_grid(size), initialize_grid(size)
+    ai_state = {'parity': random.randint(0, 1)}
     
     game_over = False
     winner = None 
@@ -470,7 +477,7 @@ def main():
     print_dual_grids(target_grid, fleet_grid, size)
 
     if turno_corrente == 'IA':
-        ai_row, ai_col = ai_advanced_shot(ai_hits_on_user, size, user_fleet)
+        ai_row, ai_col = ai_advanced_shot(ai_hits_on_user, size, user_fleet, ai_state)
         result, hit_ship = take_shot(user_grid, user_fleet, ai_hits_on_user, ai_row, ai_col)
         
         lettera = chr(ord('A') + ai_col)
@@ -505,7 +512,7 @@ def main():
         if game_over: break
 
         # 2. Turno dell'IA
-        ai_row, ai_col = ai_advanced_shot(ai_hits_on_user, size, user_fleet)
+        ai_row, ai_col = ai_advanced_shot(ai_hits_on_user, size, user_fleet, ai_state)
         result, hit_ship = take_shot(user_grid, user_fleet, ai_hits_on_user, ai_row, ai_col)
 
         # ## <-- MODIFICA: Usa l'alfabeto fonetico e condensa l'output in una riga.
