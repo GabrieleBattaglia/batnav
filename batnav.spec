@@ -1,11 +1,20 @@
 # -*- mode: python ; coding: utf-8 -*-
 
 
+# La collezione dei suoni condivisa va portata dentro il pacchetto, altrimenti
+# Acusticator non la trova e l'eseguibile resta senza i suoni presi da li'.
+# E' il difetto che ha tenuto muto batnav compilato fino alla 2.4.0.
+import os
+
+import GBUtils
+
+COLLEZIONE = os.path.join(os.path.dirname(GBUtils.__file__), 'Acu_Collection.json')
+
 a = Analysis(
     ['batnav.py'],
     pathex=[],
     binaries=[],
-    datas=[],
+    datas=[(COLLEZIONE, '.')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
