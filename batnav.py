@@ -1,42 +1,47 @@
 # BATNAV by Gabriele Battaglia (IZ4APU) and Gemini
 # Data refactor 24/09/2025
+# 03/09/2026: i suoni passano ad Acusticator, di GBUtils.
+# Autori: Gabriele Battaglia (IZ4APU) & ClaudIA (Claude Opus 5, modalita' auto)
+import json
 import random
 import sys
-import json # <-- AGGIUNTO json
-import os
 from datetime import date
 
-# Aggiunge il percorso di gbutils per poter importare GBUtils
-sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "gbutils"))
+# GBUtils sta nella path di sistema, non serve costruirsela a mano.
 try:
     from GBUtils import Acusticator
 except ImportError:
-    def Acusticator(*args, **kwargs):
-        pass
+    class _Muto:
+        """Se GBUtils manca, il gioco funziona lo stesso, in silenzio."""
+
+        def __call__(self, *args, **kwargs):
+            return False
+
+        def play(self, *args, **kwargs):
+            return False
+
+        def close(self):
+            return False
+
+    Acusticator = _Muto()
+
 
 def play_db_sound(sound_name, sync=False):
-    """Carica e riproduce un suono dal database Acu_Collection.json usando Acusticator."""
-    try:
-        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "gbutils", "Acu_Collection.json")
-        if not os.path.exists(db_path):
-            return
-        with open(db_path, "r", encoding="utf-8") as f:
-            db = json.load(f)
-        if sound_name not in db:
-            return
-        preset = db[sound_name]
-        score_flat = []
-        default_vol = 0.5
-        for q in preset['score']:
-            note, dur, pan, vol_delta = q
-            vol = max(0.0, min(1.0, default_vol + vol_delta))
-            score_flat.extend([note, dur, pan, vol])
-        Acusticator(score_flat, kind=preset['kind'], adsr=preset['adsr'], sync=sync)
-    except Exception:
-        pass
+    """Riproduce un suono della collezione condivisa, chiamandolo per nome.
+
+    Fino alla 2.4.0 questa funzione si apriva da sola Acu_Collection.json e
+    si riscriveva la conversione dei volumi, che nella collezione sono
+    scarti rispetto alla base 0.5. Cercava il file in una cartella gbutils
+    accanto al progetto, che nell'eseguibile compilato non esiste: non
+    trovandolo faceva return
+    in silenzio, e per questo la versione pubblicata era senza suoni senza
+    che nessuno se ne accorgesse. Ora legge Acusticator, che risolve il
+    percorso anche da congelato e avvisa su stderr se un nome non esiste.
+    """
+    return Acusticator.play(sound_name, sync=sync)
 
 # --- Costanti ---
-VERSIONE="2.4.0 - 28 maggio 2026 by Gabriele Battaglia (IZ4APU) and Stella"
+VERSIONE="2.4.1 - 3 settembre 2026 by Gabriele Battaglia (IZ4APU) and Stella"
 CLASSIFICA_FILE = "batnav_charts.json" # <-- NUOVA costante per il file della classifica
 CLASSIFICA_MAX_VOCI = 15 # <-- NUOVA costante per il numero massimo di voci
 NATO_PHONETIC_ALPHABET = {
