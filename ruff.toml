@@ -1,0 +1,21 @@
+# Configurazione ruff di batnav.
+# Autori: Gabriele Battaglia (IZ4APU) & ClaudIA (Claude Fable 5.1, UltraCode).
+line-length = 140
+
+[lint]
+select = ["E", "F", "W", "B", "SIM", "UP", "I", "C4", "RET", "BLE", "S", "RUF", "DTZ"]
+ignore = [
+    # Righe lunghe: i messaggi all'utente e i prompt di dgt stanno su una
+    # riga sola, e spezzarli renderebbe piu' difficile ritrovarli nel codice.
+    "E501",
+    # Lo stile di Gabriele ammette l'istruzione breve sulla stessa riga.
+    "E701",
+    "E702",
+    "E741",
+    # La data della classifica e' di proposito quella locale, senza fuso:
+    # e' il giorno in cui si e' giocato secondo il calendario di chi gioca.
+    "DTZ011",
+    "DTZ007",
+    # Il caso e' quello del gioco, non della crittografia: random basta.
+    "S311",
+]

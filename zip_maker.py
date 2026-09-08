@@ -20,7 +20,7 @@ import sys
 
 from GBUtils import crea_archivio_release
 
-FUORI = ["batnav_charts.json"]
+FUORI = ["batnav_charts.json", "batnav_charts.json.rotto", "auto_updater_error.log"]
 
 
 def main():
