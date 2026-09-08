@@ -5,6 +5,8 @@ Il changelog nasce con la versione 3.0.0. Per le versioni precedenti il resocont
 
 ## [3.0.0] - 2026-09-08
 
+Pubblicata su GitHub il 2026-09-08 come release `v3.0.0`, con il solo archivio `batnav.zip` in allegato. Verificato che l'auto updater la riconosca e ne riceva le note. Issue 1 chiusa.
+
 Revisione 1 del refactoring generale, più il motore nuovo dell'avversario e i suoni rifatti.
 
 ### Aggiunto
