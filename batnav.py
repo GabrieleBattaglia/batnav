@@ -8,17 +8,26 @@ import contextlib
 import json
 import os
 import random
-import sys
 import time
 from datetime import date, datetime
 
-from GBUtils import Acusticator, dgt, enter_escape, gestisci_aggiornamento, key, manuale, menu
+from GBUtils import (
+    Acusticator,
+    cartella_applicazione,
+    dgt,
+    enter_escape,
+    gestisci_aggiornamento,
+    key,
+    manuale,
+    menu,
+)
+from GBUtils import percorso_risorsa as percorso_risorsa_condivisa
 
 from batnav_ia import MotoreIA
 
 APP_NAME = "batnav"
-VERSIONE = "3.0.0"
-RELEASE_DATE = "2026-09-08"
+VERSIONE = "3.0.1"
+RELEASE_DATE = "2026-09-12"
 AUTORI = "Gabriele Battaglia (IZ4APU) & ClaudIA (Claude Fable 5.1, UltraCode)"
 API_RELEASE = "https://api.github.com/repos/GabrieleBattaglia/batnav/releases/latest"
 CLASSIFICA_MAX_VOCI = 15
@@ -140,19 +149,15 @@ def cartella_dati():
 
     Mai la directory di lavoro: fino alla 2.4.1 la classifica si cercava li',
     e avviando il gioco da un'altra cartella ne nasceva una seconda.
+    La logica sta in GBUtils, come tutte le utilita' condivise: qui resta il
+    nome con cui il gioco la chiama.
     """
-    if getattr(sys, "frozen", False):
-        return os.path.dirname(sys.executable)
-    return os.path.dirname(os.path.abspath(__file__))
+    return cartella_applicazione()
 
 
 def percorso_risorsa(nome):
     """Dove sta una risorsa in sola lettura, come il manuale: da compilato dentro il pacchetto."""
-    if getattr(sys, "frozen", False):
-        base = getattr(sys, "_MEIPASS", None)
-        if base and os.path.isfile(os.path.join(base, nome)):
-            return os.path.join(base, nome)
-    return os.path.join(cartella_dati(), nome)
+    return percorso_risorsa_condivisa(nome)
 
 
 CLASSIFICA_FILE = os.path.join(cartella_dati(), "batnav_charts.json")
